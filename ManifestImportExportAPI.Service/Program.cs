@@ -12,7 +12,7 @@ namespace ManifestImportExportAPI.Service
     {
         static void Main(string[] args)
         {
-            //Test sync
+            
             string host = ConfigurationManager.AppSettings["host"];
             HostFactory.Run(configuration =>
             {
