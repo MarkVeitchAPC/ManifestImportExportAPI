@@ -21,7 +21,7 @@ namespace ManifestImportExportAPI.Repositories
 
         public APCAuthRepository()
         {
-            _connectionString = System.Configuration.ConfigurationManager.AppSettings["connectionString"];
+            _connectionString = System.Configuration.ConfigurationManager.AppSettings["Main.ConnectionString"];
             if (_users == null) { var queryStatus = RetrieveAPCUserToken(); }
         }
 
