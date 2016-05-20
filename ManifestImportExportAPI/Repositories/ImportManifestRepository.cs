@@ -1,5 +1,6 @@
 ﻿using System;
 using ManifestImportExportAPI.Models;
+using ManifestImportExportAPI.Models.ManifestImportStructures;
 using System.Collections.Immutable;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
@@ -9,6 +10,7 @@ using System.Data.SqlClient;
 using System.Data;
 using ManifestImportExportAPI.Domain;
 using NLog;
+using System.Globalization;
 
 namespace ManifestImportExportAPI.Repositories
 {
@@ -20,6 +22,7 @@ namespace ManifestImportExportAPI.Repositories
         private Guid _depotKey;
         private int _depotNumber;
         private bool _scottishManifest;
+        private string _loadedBy;
         private int _scottishCount = 0;
         private int _englishCount = 0;
         private int _scottishImported = 0;
@@ -34,15 +37,16 @@ namespace ManifestImportExportAPI.Repositories
         public ImportManifestRepository()
         {
             //TODO set up both of these connection strings in the config
-            _connectionString = System.Configuration.ConfigurationManager.AppSettings["connectionString"];
+            _connectionString = System.Configuration.ConfigurationManager.AppSettings["Main.ConnectionString"];
             _connectionString_HubData_MySQL = System.Configuration.ConfigurationManager.AppSettings["connectionString_HubData_MySQL"];
         }
 
-        public RetrieveResults<ManifestImportDetailUpdateFailed> ImportManifest(string Json, int depotnumber, bool scottishManifest)
+        //18-05-2016 public RetrieveResults<ManifestImportDetailUpdateFailed> ImportManifest(string Json, int depotnumber, bool scottishManifest)
+        public RetrieveResults<ManifestImportDetailUpdateFailed> ImportManifest(JObject Json)
         {
-            _depotNumber = depotnumber;
-            _scottishManifest = scottishManifest;
-            _depotKey = GetImportManifestDepotKey(); 
+            //_depotNumber = depotNumber; 
+            //_scottishManifest = scottishManifest;
+            //_depotKey = GetImportManifestDepotKey(); 
 
             //var builderOut = ImmutableList.CreateBuilder<List<ManifestImportFailed>>();
             var builderOut = ImmutableList.CreateBuilder<ManifestImportDetailUpdateFailed>();
@@ -53,11 +57,132 @@ namespace ManifestImportExportAPI.Repositories
 
             ManifestImportFailed manifest = new ManifestImportFailed();
 
-            JArray importCons = JArray.Parse(Json);
-            var importConsList = importCons.Select(p => new ManifestImport(p));
-            foreach (var item in importConsList)
+            foreach (var item in Json)
             {
-                builderIn.Add(item);
+                if (item.Key == "parameters")
+                {
+                    var param = new JArray(item.Value);
+                    param = JArray.Parse(item.Value.ToString());
+                    foreach (var field in param.Children())
+                    {
+                        var itemProperties = field.Children<JProperty>();
+                        _depotNumber = (int)itemProperties.FirstOrDefault(x => x.Name == "depotNumber");
+                        _scottishManifest = (bool)itemProperties.FirstOrDefault(x => x.Name == "isScottish");
+                        _loadedBy = (string)itemProperties.FirstOrDefault(x => x.Name == "loadedBy");
+                    }
+                }
+            }
+
+            foreach (var item in Json)
+            { 
+                if (item.Key == "data")
+                {
+                    var data = new JArray(item.Value);
+                    data = JArray.Parse(item.Value.ToString());
+                    foreach (var field in data.Children())
+                    {
+                        var itemProperties = field.Children<JProperty>();
+
+                        var dt = GetSendDate(itemProperties.FirstOrDefault(x => x.Name == "DATE").Value.ToString());
+
+                        var mi = new ManifestImport(_depotNumber, _scottishManifest,
+                                                    new ManifestImportConsignmentHeader((string)itemProperties.FirstOrDefault(x => x.Name == "DOCNUM"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "OLDACCNO"),
+                                                                                        (int)itemProperties.FirstOrDefault(x => x.Name == "REQUESTDEP"),
+                                                                                        (int)itemProperties.FirstOrDefault(x => x.Name == "SENDDEP"),
+                                                                                        (int)itemProperties.FirstOrDefault(x => x.Name == "DELIVERDEP"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "SERVICE"),
+                                                                                        //(DateTime)itemProperties.FirstOrDefault(x => x.Name == "COLLDATE"),
+                                                                                        DateTime.MinValue, // CollDate
+                                                                                        GetSendDate(itemProperties.FirstOrDefault(x => x.Name == "DATE").Value.ToString()),
+                                                                                        //DateTime.ParseExact((itemProperties.FirstOrDefault(x => x.Name == "DATE").ToString()), "MM/dd/yyyy hh:mm:ss ttt", CultureInfo.InvariantCulture), 
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONORREF"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "IDENTIFIER"),
+                                                                                        GetRouteID(itemProperties.FirstOrDefault(x => x.Name == "ROUTE").Value.ToString()), 
+                                                                                        null, // ClaimsRef
+                                                                                              //(bool)itemProperties.FirstOrDefault(x => x.Name == "SECURITY"),
+                                                                                        (itemProperties.FirstOrDefault(x => x.Name == "SECURITY")).ToString() == "1" ? true : false,
+
+                                                                                        0, // GoodsTypeId
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "SPECIALINS"),
+                                                                                        DateTime.MinValue, // GoodsReadyTimeFrom
+                                                                                        DateTime.MinValue, // GoodsReadyTimeTo
+                                                                                        (Decimal)itemProperties.FirstOrDefault(x => x.Name == "INSURVALUE"),
+                                                                                        //(bool)itemProperties.FirstOrDefault(x => x.Name == "FRAGILE"),
+                                                                                        (itemProperties.FirstOrDefault(x => x.Name == "FRAGILE")).ToString() == "1" ? true : false,
+                                                                                        false, // NonConveyorable
+                                                                                               //(bool)itemProperties.FirstOrDefault(x => x.Name == "VOLUME"),
+                                                                                        (itemProperties.FirstOrDefault(x => x.Name == "VOLUME")).ToString() == "1" ? true : false,
+                                                                                        (Decimal)itemProperties.FirstOrDefault(x => x.Name == "WEIGHT"),
+                                                                                        (Decimal)itemProperties.FirstOrDefault(x => x.Name == "TRUEWEIGHT"),
+                                                                                        string.Empty, // DiscrepCode
+                                                                                        null, // ConneeRef
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "ENTRYTYPE"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONEEFAO"),
+                                                                                        (int)itemProperties.FirstOrDefault(x => x.Name == "CARTONS")),
+
+                                                    new ManifestImportAddress((string)itemProperties.FirstOrDefault(x => x.Name == "CONSIGNOR"),
+                                                                                        null, null, null, null,
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONORADDR1"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONORADDR2"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONORADDR3"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONORADDR4"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONORPCODE"),
+                                                                                        0, false,
+                                                                                        //(Boolean)itemProperties.FirstOrDefault(x => x.Name == "CONEEQAS")),
+                                                                                        (itemProperties.FirstOrDefault(x => x.Name == "CONEEQAS")).ToString() == "1" ? true : false),
+
+                                                    new ManifestImportAddress((string)itemProperties.FirstOrDefault(x => x.Name == "CONSIGNOR"),
+                                                                                        null, null, null, null,
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONEEADDR1"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONEEADDR2"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONEEADDR3"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONEEADDR4"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONEEPCODE"),
+                                                                                        0, false,
+                                                                                        //(Boolean)itemProperties.FirstOrDefault(x => x.Name == "CONEEQAS")),
+                                                                                        (itemProperties.FirstOrDefault(x => x.Name == "CONEEQAS")).ToString() == "1" ? true : false),
+
+                                                    new ManifestImportContact((string)itemProperties.FirstOrDefault(x => x.Name == "CONTACT"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONORTEL"),
+                                                                                        (string)string.Empty,  // Mobile Number
+                                                                                        (string)string.Empty,  // Fax Number 
+                                                                                        (string)string.Empty,  // Email Address
+                                                                                        false,                 // Email alert
+                                                                                        false),                // Active 
+
+                                                    new ManifestImportContact((string)itemProperties.FirstOrDefault(x => x.Name == "CONSIGNEE"),
+                                                                                        (string)itemProperties.FirstOrDefault(x => x.Name == "CONEETEL"),
+                                                                                        (string)string.Empty,  // Mobile Number
+                                                                                        (string)string.Empty,  // Fax Number 
+                                                                                        (string)string.Empty,  // Email Address
+                                                                                        false,                 // Email alert
+                                                                                        false),                // Active 
+
+                                                    new ManifestImportConsignmentItem(0,                    // ItemStatus 
+                                                                                      0,                    // Item Number
+                                                                                      //(bool)itemProperties.FirstOrDefault(x => x.Name == "VOLUME"),
+                                                                                      (itemProperties.FirstOrDefault(x => x.Name == "VOLUME")).ToString() == "1" ? true : false,
+                                                                                      (string)string.Empty, // ShortRef
+                                                                                      (string)string.Empty, // CustomerRef1
+                                                                                      (string)string.Empty, // CustomerRef2 
+                                                                                      false,                // AutuPrintedLabel
+                                                                                      false,                // LabelPrinted
+                                                                                      (Decimal)itemProperties.FirstOrDefault(x => x.Name == "WEIGHT"),
+                                                                                      (Decimal)itemProperties.FirstOrDefault(x => x.Name == "LSIZE"),
+                                                                                      (Decimal)itemProperties.FirstOrDefault(x => x.Name == "WSIZE"),
+                                                                                      (Decimal)itemProperties.FirstOrDefault(x => x.Name == "HSIZE"),
+                                                                                      (Decimal)itemProperties.FirstOrDefault(x => x.Name == "TRUEWEIGHT")),
+                                                    new ManifestImportComment(0,                            // CommentVisibityId
+                                                                             (string)string.Empty),         // Comment   
+
+                                                    new ManifestImportConsignorPricing(0,                   // Price
+                                                                                       0,                   // Invoice Number
+                                                                                       false,               // Verified
+                                                                                       false));             // Manually Priced  
+                        builderIn.Add(mi); 
+                    }
+                }
             }
 
             foreach (var item in builderIn)
@@ -116,6 +241,34 @@ namespace ManifestImportExportAPI.Repositories
 
             //TODO - build the list of cons that failed import 
             return new RetrieveResults<ManifestImportDetailUpdateFailed>(builderOut.ToImmutableList(), queryStatus);
+        }
+
+        /// <summary>
+        /// Purpose of this is to convert the String ROUTE from the manifest Import JSON into a Int which on passing to the inserting sproc we will convert to the
+        /// string representation that is stored on the database; SCOTTish => SCOT and CENTRAL => APC 
+        /// </summary>
+        /// <param name="route"></param>
+        /// <returns></returns>
+        private int GetRouteID(string route)
+        {
+            switch (route)
+            {
+                //case 1: route = "LOCAL"; break;
+                //case 2: route = "APC"; break;
+                //case 3: route = "SCOT"; break;
+                //case 4: route = "NORTH"; break;
+                //default: route = "OTHER"; break;
+                case "LOCAL": return 1;
+                case "CENTRAL": return 2;
+                case "SCOTTISH": return 3;
+                case "NORTH": return 4;
+                default: return 5;
+            }
+        }
+
+        private DateTime GetSendDate(string dbfDate)
+        {
+            return (new DateTime(Convert.ToInt32(dbfDate.Substring(0, 4)), Convert.ToInt32(dbfDate.Substring(4, 2)), Convert.ToInt32(dbfDate.Substring(6, 2)), 00, 00, 00));
         }
 
         private Guid GetImportManifestDepotKey()
@@ -225,24 +378,22 @@ namespace ManifestImportExportAPI.Repositories
             bool log = true;
             string returnedText = "Imported: 0";
 
-            // TODO - we don't know who has done the loading yet - needs adding
-            //                string loadedBy = UserMaintenanceProcessing.RetrieveUserNameForUserKey(APCCommon.GetUserKey(sessionKey));
-            //                if (loadedBy.Length > 15) loadedBy = loadedBy.Substring(0, 15);
             using (SqlConnection connection = new SqlConnection(_connectionString_HubData_MySQL))
             {
                 try
                 {
                     connection.Open();
-                    var cmd = new SqlCommand("dbo.InsertOrUpdateManifestConsignment", connection);
+                    var cmd = new SqlCommand("dbo.InsertOrUpdateImportedCons", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ConNumber", item.conHeader.ConNumber);
                     cmd.Parameters.AddWithValue("@SendDate", item.conHeader.SendDate);
                     cmd.Parameters.AddWithValue("@Accountno", item.conHeader.AccountNo);
-                    cmd.Parameters.AddWithValue("@Contact", item.conCollContact.ContactName);
+                    //cmd.Parameters.AddWithValue("@Contact", item.conCollContact.ContactName);
                     cmd.Parameters.AddWithValue("@ReqDepot", (int)item.conHeader.ReqDepot);
                     cmd.Parameters.AddWithValue("@SendDepot", (int)item.conHeader.SendDepot);
                     cmd.Parameters.AddWithValue("@DelivDepot", (int)item.conHeader.DelivDepot);
                     cmd.Parameters.AddWithValue("@DiscrepCode", item.conHeader.DiscrepancyCode);
+                    cmd.Parameters.AddWithValue("@ConeeFao", item.conHeader.ConeeFao);
 
                     // Collection Address - Consignor
                     cmd.Parameters.AddWithValue("@ConorCompanyName", item.conCollAddress.CompanyName);
@@ -253,6 +404,7 @@ namespace ManifestImportExportAPI.Repositories
                     cmd.Parameters.AddWithValue("@ConorPcode", item.conCollAddress.PostCode);
                     cmd.Parameters.AddWithValue("@ConorContactName", "Unknown");
                     cmd.Parameters.AddWithValue("@ConorContactTelephone", item.conCollContact.ContactTelephone);
+                    cmd.Parameters.AddWithValue("@ConorRef", item.conHeader.ConorRef);
 
                     // Delivery Address - Consignee
                     cmd.Parameters.AddWithValue("@ConeeCompanyName", item.conDelAddress.CompanyName);
@@ -285,15 +437,17 @@ namespace ManifestImportExportAPI.Repositories
                     cmd.Parameters.AddWithValue("@Identifier", item.conHeader.Identifier);
                     cmd.Parameters.AddWithValue("@Fragile", item.conHeader.Fragile);
 
-                    //TODO - add the user key of the person doing the import
-                    //cons.LoadedBy = loadedBy;
-                    cmd.Parameters.AddWithValue("@LoadedDate", DateTime.Now);
-                    cmd.Parameters.AddWithValue("@LoadedTime", string.Format("{ 0:d2}:{1:d2}:{2:d2}", DateTime.Now.Hour, DateTime.Now.Minute, DateTime.Now.Second));
 
-                    int rowsUpdated = cmd.ExecuteNonQuery();
+                    cmd.Parameters.AddWithValue("@LoadedBy", _loadedBy);
+                    cmd.Parameters.Add("@LoadedDate", SqlDbType.DateTime);
+                    cmd.Parameters["@LoadedDate"].Value = DateTime.Now;
+                    cmd.Parameters.Add("@LoadedTime", SqlDbType.Time);
+                    cmd.Parameters["@LoadedTime"].Value = DateTime.Now.ToString("hh:mm:ss");
+
+                    //int rowsUpdated = cmd.ExecuteNonQuery();
 
                     // Create our own object so we can do some conversions
-                    connection.Open();
+                    //connection.Open();
                     SqlCommand comm = new SqlCommand("SELECT COUNT(*) FROM dbo.consignments WHERE identifier = " + item.conHeader.Identifier +
                                                      " AND requestdep = " + item.conHeader.ReqDepot +
                                                      " AND sendDep = " + item.conHeader.SendDepot +
@@ -396,21 +550,23 @@ namespace ManifestImportExportAPI.Repositories
             // TODO - we don't know who has done the loading yet - needs adding
             //                string loadedBy = UserMaintenanceProcessing.RetrieveUserNameForUserKey(APCCommon.GetUserKey(sessionKey));
             //                if (loadedBy.Length > 15) loadedBy = loadedBy.Substring(0, 15);
+            var userKey = Guid.Parse("2E2F5279-A6D3-46EB-BFD4-78C6A1B51BA0"); 
             using (SqlConnection connection = new SqlConnection(_connectionString_HubData_MySQL))
             {
                 try
                 {
                     connection.Open();
-                    var cmd = new SqlCommand("dbo.InsertOrUpdateManifestConsignment", connection);
+                    var cmd = new SqlCommand("dbo.InsertOrUpdateImportedCons", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ConNumber", item.conHeader.ConNumber);
                     cmd.Parameters.AddWithValue("@SendDate", item.conHeader.SendDate);
                     cmd.Parameters.AddWithValue("@Accountno", item.conHeader.AccountNo);
-                    cmd.Parameters.AddWithValue("@Contact", item.conCollContact.ContactName);
+                    //cmd.Parameters.AddWithValue("@Contact", item.conCollContact.ContactName);
                     cmd.Parameters.AddWithValue("@ReqDepot", (int)item.conHeader.ReqDepot);
                     cmd.Parameters.AddWithValue("@SendDepot", (int)item.conHeader.SendDepot);
                     cmd.Parameters.AddWithValue("@DelivDepot", (int)item.conHeader.DelivDepot);
                     cmd.Parameters.AddWithValue("@DiscrepCode", item.conHeader.DiscrepancyCode);
+                    cmd.Parameters.AddWithValue("@ConeeFao", item.conHeader.ConeeFao); 
 
                     // Collection Address - Consignor
                     cmd.Parameters.AddWithValue("@ConorCompanyName", item.conCollAddress.CompanyName);
@@ -421,6 +577,7 @@ namespace ManifestImportExportAPI.Repositories
                     cmd.Parameters.AddWithValue("@ConorPcode", item.conCollAddress.PostCode);
                     cmd.Parameters.AddWithValue("@ConorContactName", "Unknown");
                     cmd.Parameters.AddWithValue("@ConorContactTelephone", item.conCollContact.ContactTelephone);
+                    cmd.Parameters.AddWithValue("@ConorRef", item.conHeader.ConorRef);
 
                     // Delivery Address - Consignee
                     cmd.Parameters.AddWithValue("@ConeeCompanyName", item.conDelAddress.CompanyName);
@@ -456,20 +613,21 @@ namespace ManifestImportExportAPI.Repositories
                     cmd.Parameters.AddWithValue("@Fragile", item.conHeader.Fragile);
                     cmd.Parameters.AddWithValue("@DepEntType", item.conHeader.EntryType);
 
-                    //TODO - add the user key of the person doing the import
-                    //cons.LoadedBy = loadedBy;
-                    cmd.Parameters.AddWithValue("@LoadedDate", DateTime.Now);
-                    cmd.Parameters.AddWithValue("@LoadedTime", string.Format("{ 0:d2}:{1:d2}:{2:d2}", DateTime.Now.Hour, DateTime.Now.Minute, DateTime.Now.Second));
+                    cmd.Parameters.AddWithValue("@LoadedBy", _loadedBy);
+                    cmd.Parameters.Add("@LoadedDate", SqlDbType.DateTime);
+                    cmd.Parameters["@LoadedDate"].Value = DateTime.Now;
+                    cmd.Parameters.Add("@LoadedTime", SqlDbType.Time);
+                    cmd.Parameters["@LoadedTime"].Value = DateTime.Now.ToString("hh:mm:ss");
 
-                    int rowsUpdated = cmd.ExecuteNonQuery();
+                    //int rowsUpdated = cmd.ExecuteNonQuery();
 
-                    // Create our own object so we can do some conversions
-                    connection.Open();
-                    SqlCommand comm = new SqlCommand("SELECT COUNT(*) FROM dbo.consignments WHERE identifier = " + item.conHeader.Identifier +
-                                                     " AND requestdep = " + item.conHeader.ReqDepot +
+                    //// Create our own object so we can do some conversions
+                    //connection.Open();
+                    SqlCommand comm = new SqlCommand("SELECT COUNT(*) FROM dbo.consignments WHERE identifier = '" + item.conHeader.Identifier + "'" +
+                                                     " AND requestdep = " + item.conHeader.ReqDepot + 
                                                      " AND sendDep = " + item.conHeader.SendDepot +
                                                      " AND deliverdep = " + item.conHeader.DelivDepot +
-                                                     " AND date = " + item.conHeader.SendDate
+                                                     " AND date = '" + item.conHeader.SendDate + "'"
                                                     , connection);
                     int conExists = (int)comm.ExecuteScalar();
 

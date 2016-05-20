@@ -18,7 +18,7 @@ namespace ManifestImportExportAPI.Repositories
 
         public ManifestRepository()
         {
-            _connectionString = System.Configuration.ConfigurationManager.AppSettings["connectionString"];
+            _connectionString = System.Configuration.ConfigurationManager.AppSettings["Main.ConnectionString"];
         }
 
         public RetrieveResults<ManifestList> RetrieveManifestList(DateTime date)

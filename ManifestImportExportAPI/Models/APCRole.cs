@@ -5,7 +5,7 @@ namespace ManifestImportExportAPI.Models
 {
     public enum APCRoleType
     {
-        Depot, Consignor, ThirdParty, InPost
+        Depot, Consignor, ThirdParty, InPost, MIE
     }
     public class APCRole : IRole<string>
     {

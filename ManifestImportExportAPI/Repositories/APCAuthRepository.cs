@@ -50,7 +50,6 @@ namespace ManifestImportExportAPI.Repositories
                     {
                         while (dr.Read())
                         {
-                            count++;
                             var clientName = Parse.ParseString(dr["Client"].ToString());
                             if (clientName != lastClient)
                             {
@@ -77,6 +76,7 @@ namespace ManifestImportExportAPI.Repositories
                                 builder.Remove((count).ToString());
                                 builder.Add(count.ToString(), newUser);
                             }
+                            count++;
                         }
                         _users = builder.ToImmutableDictionary();
                     }

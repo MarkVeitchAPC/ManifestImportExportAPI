@@ -29,6 +29,8 @@ namespace ManifestImportExportAPI
         public static void RegisterTypes(IUnityContainer container)
         {
             var apcAuthRepoManager = new ContainerControlledLifetimeManager();
+            container.RegisterType<IExportManifestRepository, ExportManifestRepository>();
+            container.RegisterType<IImportManifestRepository, ImportManifestRepository>();
             container.RegisterType<IAPCAuthRepository, APCAuthRepository>("UserRepo", apcAuthRepoManager);
 
         }

@@ -10,9 +10,13 @@ namespace ManifestImportExportAPI.Controllers
     public class ExportController
     {
         [RoutePrefix("api/ExportManifest")]
+        [Authorize(Roles = "MIE")]
         public class ExportManifestController : BaseApiController
         {
             public IExportManifestRepository Repository { get; set; }
+
+            public ExportManifestController()
+            { }
 
             public ExportManifestController(IExportManifestRepository repo)
             {

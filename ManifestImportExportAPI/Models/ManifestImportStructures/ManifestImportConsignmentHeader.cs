@@ -35,6 +35,7 @@ namespace ManifestImportExportAPI.Models
         public string DeliveryRef { get; private set; }
         public string EntryType { get; private set; }
         public string ConeeFao { get; private set; } 
+        public int Cartons { get; private set; }
 
         public ManifestImportConsignmentHeader(string mIConsignmentNumber,
                                                string miAccountNo,
@@ -63,7 +64,8 @@ namespace ManifestImportExportAPI.Models
                                                string mIDiscrepancyCode,
                                                string mIDeliveryRef,
                                                string mIEntryType,
-                                               string mIConeeFao)
+                                               string mIConeeFao,
+                                               int mICartons)
         {
             ConNumber = mIConsignmentNumber;
             AccountNo = miAccountNo;
@@ -93,6 +95,7 @@ namespace ManifestImportExportAPI.Models
             DeliveryRef = mIDeliveryRef;
             EntryType = mIEntryType;
             ConeeFao = mIConeeFao;
+            Cartons = mICartons;
         }
 
         public ManifestImportConsignmentHeader()

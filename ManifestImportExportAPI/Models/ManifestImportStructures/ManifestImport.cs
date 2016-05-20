@@ -9,7 +9,9 @@ namespace ManifestImportExportAPI.Models
 {
     public class ManifestImport
     {
-        public Boolean QuarantineConsignment { get; private set; }
+        //public Boolean QuarantineConsignment { get; private set; }
+        public int manifestImportDepotNumber { get; private set; }
+        public Boolean manifestScottish { get; private set; }
         public ManifestImportConsignmentHeader conHeader { get; private set; }
         public ManifestImportAddress conCollAddress { get; private set; }
         public ManifestImportAddress conDelAddress { get; private set; }
@@ -19,7 +21,10 @@ namespace ManifestImportExportAPI.Models
         public ManifestImportComment conComment { get; private set; }
         public ManifestImportConsignorPricing consPricing { get; private set; }
 
-        public ManifestImport(Boolean miQuarantineConsignment,    
+        public ManifestImport(
+                              int mIDepotNumber, 
+                              Boolean miScottish, 
+                              //Boolean miQuarantineConsignment,    
                               ManifestImportConsignmentHeader mIConsignmentHeader,
                               ManifestImportAddress mIConsignmentCollAddress,
                               ManifestImportAddress mIConsignmentDelAddress,
@@ -29,7 +34,9 @@ namespace ManifestImportExportAPI.Models
                               ManifestImportComment mIComment, 
                               ManifestImportConsignorPricing mIConsignorPricing)
         {
-            QuarantineConsignment = miQuarantineConsignment;
+            manifestImportDepotNumber = mIDepotNumber;
+            manifestScottish = miScottish;
+            //QuarantineConsignment = miQuarantineConsignment;
             conHeader = mIConsignmentHeader;
             conCollAddress = mIConsignmentCollAddress;
             conDelAddress = mIConsignmentDelAddress;
@@ -42,7 +49,9 @@ namespace ManifestImportExportAPI.Models
 
         public ManifestImport(JToken json)
         {
-            QuarantineConsignment = (bool)json["QuarantinedConsignment"];
+            manifestImportDepotNumber = (int)json["depotNumber"];
+            manifestScottish = (bool)json["scottishManifest"];
+            //QuarantineConsignment = (bool)json["QuarantinedConsignment"];
             conHeader = ParseManifestImportConsignmentHeader(json);
             conCollAddress = ParseManifestImportAddress(json);
             conDelAddress = ParseManifestImportAddress(json);

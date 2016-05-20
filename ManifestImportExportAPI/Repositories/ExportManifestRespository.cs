@@ -15,7 +15,7 @@ namespace ManifestImportExportAPI.Repositories
 
         public ExportManifestRepository()
         {
-            _connectionString = System.Configuration.ConfigurationManager.AppSettings["connectionString"];
+            _connectionString = System.Configuration.ConfigurationManager.AppSettings["Main.ConnectionString"];
         }
 
         public RetrieveResults<ManifestExport> ExportManifest(Int32 depotNumber, DateTime manifestDate)
@@ -23,39 +23,56 @@ namespace ManifestImportExportAPI.Repositories
             var builder = ImmutableList.CreateBuilder<ManifestExport>();
             var queryStatus = QueryStatus.OK;
 
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (SqlConnection connection1 = new SqlConnection(_connectionString))
             {
                 try
                 {
-                    connection.Open();
-                    var cmd = new SqlCommand("dbo.GetDepotOrganisationNameByDepotNumber", connection);
+                    connection1.Open();
+                    var cmd = new SqlCommand("dbo.GetDepotOrganisationNameByDepotNumber", connection1);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@DepotNumber", depotNumber);
 
                     var dr = cmd.ExecuteReader();
+
                     if (dr.HasRows)
                     {
                         dr.Read();
-                        var depotKey = Parse.ParseString(dr["DepotNumber"].ToString());
+                        var depotKey = Parse.ParseString(dr["DepotKey"].ToString());
 
-                        cmd = new SqlCommand("dbo.GetConsignmentsForManifestExportFromTNG2", connection);
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@ManifestDate", manifestDate);
-                        cmd.Parameters.AddWithValue("@DepotKey", depotKey);
-
-                        dr = cmd.ExecuteReader();
-                        if (dr.HasRows)
+                        using (SqlConnection connection2 = new SqlConnection(_connectionString))
                         {
-                            while (dr.Read())
+                            try
                             {
-                                var manifestExport = ParseManifestExport(dr);
-                                builder.Add(manifestExport);
+                                connection2.Open();
+                                var cmd1 = new SqlCommand("dbo.GetConsignmentsForManifestExportFromTNG2", connection2);
+                                cmd1.CommandType = CommandType.StoredProcedure;
+                                cmd1.Parameters.Add("@ManifestDate", SqlDbType.Date);
+                                cmd1.Parameters["@ManifestDate"].Value = manifestDate.Date;
+                                cmd1.Parameters.Add("@DepotKey", SqlDbType.UniqueIdentifier);
+                                cmd1.Parameters["@DepotKey"].Value = new Guid(depotKey);
+
+                                var dr1 = cmd1.ExecuteReader();
+
+                                while (dr1.Read())
+                                {
+                                    var manifestExport = ParseManifestExport(dr1);
+                                    builder.Add(manifestExport);
+                                }
+                                if (builder.Count == 0) { queryStatus = QueryStatus.NO_DATA; }
                             }
-                        }
-                        else
-                        {
-                            queryStatus = QueryStatus.NO_DATA;
-                        }
+                            catch (InvalidOperationException ex)
+                            {
+
+                                queryStatus = QueryStatus.FAILED_CONNECTION;
+                                builder.Clear();
+                            }
+                            catch (SqlException ex)
+                            {
+
+                                queryStatus = QueryStatus.FAIL;
+                                builder.Clear();
+                            }
+                        } 
                     }
                 }
                 catch (InvalidOperationException ex)
@@ -95,23 +112,38 @@ namespace ManifestImportExportAPI.Repositories
                         dr.Read();
                         var depotKey = Parse.ParseString(dr["DepotKey"].ToString());
 
-                        cmd = new SqlCommand("dbo.GetBarcodeForManifestExportFromTNG2", connection);
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@ManifestDate", manifestDate);
-                        cmd.Parameters.AddWithValue("@DepotKey", depotKey);
-
-                        dr = cmd.ExecuteReader();
-                        if (dr.HasRows)
+                        using (SqlConnection connection1 = new SqlConnection(_connectionString))
                         {
-                            while (dr.Read())
+                            try
                             {
-                                var manifestExportBarcode = ParseManifestExportBarcode(dr);
-                                builder.Add(manifestExportBarcode);
+                                connection1.Open();
+
+                                var cmd1 = new SqlCommand("dbo.GetBarcodeForManifestExportFromTNG2", connection1);
+                                cmd1.CommandType = CommandType.StoredProcedure;
+                                cmd1.Parameters.AddWithValue("@ManifestDate", manifestDate);
+                                cmd1.Parameters.AddWithValue("@DepotKey", depotKey);
+
+                                var dr1 = cmd1.ExecuteReader();
+
+                                while (dr1.Read())
+                                {
+                                    var manifestExportBarcode = ParseManifestExportBarcode(dr1);
+                                    builder.Add(manifestExportBarcode);
+                                }
+                                if (builder.Count == 0) { queryStatus = QueryStatus.NO_DATA; }
                             }
-                        }
-                        else
-                        {
-                            queryStatus = QueryStatus.NO_DATA;
+                            catch (InvalidOperationException ex)
+                            {
+
+                                queryStatus = QueryStatus.FAILED_CONNECTION;
+                                builder.Clear();
+                            }
+                            catch (SqlException ex)
+                            {
+
+                                queryStatus = QueryStatus.FAIL;
+                                builder.Clear();
+                            }
                         }
                     }
                 }
@@ -142,7 +174,7 @@ namespace ManifestImportExportAPI.Repositories
                     SqlCommand comm = new SqlCommand("SELECT COUNT(*) FROM dbo.ConsignmentsToBePriced WHERE PricingCompleted IS NULL", connection);
                     int unpricedConsignments = (int)comm.ExecuteScalar();
 
-                    comm = new SqlCommand("SELECT COUNT(*) FROM dbo.ConsignmentsToBeMigrated WHERE PricingCompleted IS NULL", connection);
+                    comm = new SqlCommand("SELECT COUNT(*) FROM dbo.ConsignmentsToBeMigrated WHERE Migrated = 0", connection);
                     int unmigratedConsignments = (int)comm.ExecuteScalar();
 
                     var ManifestExportCounts = new ManifestExportCounts(unpricedConsignments, unmigratedConsignments);
