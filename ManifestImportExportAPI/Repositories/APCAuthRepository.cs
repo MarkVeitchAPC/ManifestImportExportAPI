@@ -10,14 +10,13 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using System.Web;
 
 namespace ManifestImportExportAPI.Repositories
 {
     public class APCAuthRepository : IAPCAuthRepository
     {
         private ImmutableDictionary<string, APCUser> _users;
-        private string _connectionString;
+        private readonly string _connectionString;
 
         public APCAuthRepository()
         {
@@ -29,20 +28,18 @@ namespace ManifestImportExportAPI.Repositories
         {
             var queryStatus = QueryStatus.OK;
             var lastClient = string.Empty;
-            var hasher = new PasswordHasher();
             var builder = ImmutableDictionary.CreateBuilder<string, APCUser>();
-            var newUser = new APCUser();
 
-            APCUser apcUser = new APCUser();
-
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            using (var connection = new SqlConnection(_connectionString))
             {
                 try
                 {
                     connection.Open();
 
-                    var cmd = new SqlCommand("dbo.APCTrackerWebAPIGetAuthorisation", connection);
-                    cmd.CommandType = CommandType.StoredProcedure;
+                    var cmd = new SqlCommand("dbo.APCTrackerWebAPIGetAuthorisation", connection)
+                    {
+                        CommandType = CommandType.StoredProcedure
+                    };
                     var count = 0;
 
                     var dr = cmd.ExecuteReader();
@@ -51,6 +48,7 @@ namespace ManifestImportExportAPI.Repositories
                         while (dr.Read())
                         {
                             var clientName = Parse.ParseString(dr["Client"].ToString());
+                            APCUser newUser;
                             if (clientName != lastClient)
                             {
                                 newUser = new APCUser
@@ -69,10 +67,10 @@ namespace ManifestImportExportAPI.Repositories
                             {
                                 count--;
                                 var lastAdded = (count).ToString();
-                                newUser = new APCUser();
+                                var apcUser = new APCUser();
                                 newUser = builder.GetValueOrDefault(lastAdded);
-                                string APCAccountNumber = Parse.ParseString(dr["APCAccountNumber"].ToString()) ?? string.Empty;
-                                if (APCAccountNumber != string.Empty) newUser.Accounts.Add(APCAccountNumber);
+                                var apcAccountNumber = Parse.ParseString(dr["APCAccountNumber"].ToString()) ?? string.Empty;
+                                if (apcAccountNumber != string.Empty) newUser.Accounts.Add(apcAccountNumber);
                                 builder.Remove((count).ToString());
                                 builder.Add(count.ToString(), newUser);
                             }
@@ -85,13 +83,13 @@ namespace ManifestImportExportAPI.Repositories
                         queryStatus = QueryStatus.NO_DATA;
                     }
                 }
-                catch (InvalidOperationException ex)
+                catch (InvalidOperationException)
                 {
 
                     queryStatus = QueryStatus.FAILED_CONNECTION;
                     builder.Clear();
                 }
-                catch (SqlException ex)
+                catch (SqlException)
                 {
 
                     queryStatus = QueryStatus.FAIL;
@@ -139,7 +137,7 @@ namespace ManifestImportExportAPI.Repositories
         public Task<APCUser> FindByIdAsync(string userId)
         {
             var user = _users[userId];
-            return Task.FromResult<APCUser>(user);
+            return Task.FromResult(user);
         }
 
         public Task<APCUser> FindByIdAsync(int userId)
@@ -149,12 +147,12 @@ namespace ManifestImportExportAPI.Repositories
 
         public Task<APCUser> FindByNameAsync(string userName)
         {
-            APCUser user = new APCUser();
+            var user = new APCUser();
             if (_users != null)
             {
-                user = _users.Values.Where(x => x.UserName.Equals(userName)).First();
+                user = _users.Values.First(x => x.UserName.Equals(userName));
             }
-            return Task.FromResult<APCUser>(user);
+            return Task.FromResult(user);
         }
 
         public Task<IList<Claim>> GetClaimsAsync(APCUser user)

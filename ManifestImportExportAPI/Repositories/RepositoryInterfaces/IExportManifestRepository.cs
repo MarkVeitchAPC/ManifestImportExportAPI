@@ -13,7 +13,7 @@ namespace ManifestImportExportAPI.Repositories.RepositoryInterfaces
 
         RetrieveResults<ManifestExport> ExportManifest(Int32 depotNumber, DateTime manifestDate);
         RetrieveResults<ManifestExportBarcode> ExportManifestBarcode(Int32 depotNumber, DateTime manifestDate);
-        RetrieveResults<ManifestImportDetailUpdateFailed> ManifestImportDetailUpdate(string Json);
+        RetrieveResults<ManifestImportDetailUpdateFailed> ManifestImportDetailUpdate(string json);
         RetrieveResults<ManifestExportCounts> ManifestExportCounts();
     }
 }

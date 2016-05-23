@@ -25,7 +25,6 @@ namespace ManifestImportExportAPI.Repositories
         {
             var builder = ImmutableList.CreateBuilder<ManifestList>();
             var queryStatus = QueryStatus.OK;
-            var lastHeaderKey = string.Empty;
             ManifestList manifest = new ManifestList();
 
             //using (SqlConnection connection = new SqlConnection(_connectionString))

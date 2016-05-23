@@ -1,8 +1,6 @@
 ﻿using ManifestImportExportAPI.Models;
 using ManifestImportExportAPI.Repositories;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
 using System.Web.Http;
 
 namespace ManifestImportExportAPI.Controllers
@@ -23,19 +21,14 @@ namespace ManifestImportExportAPI.Controllers
                 Repository = repo;
             }
 
-            // POST: api/ImportManifest
             [HttpPost]
-            //18-05-2016 public IHttpActionResult Post([FromBody]string Json, Int32 depotNumber, bool scottishManifest)
-            public IHttpActionResult Post([FromBody]JObject Json)
+            public IHttpActionResult Post([FromBody]JObject json)
             {
-                RetrieveResults<ManifestImportDetailUpdateFailed> FailedImportManifestResult = new RetrieveResults<ManifestImportDetailUpdateFailed>();
+                var failedImportManifestResult = Repository.ImportManifest(json);
 
-                //18-05-2016 FailedImportManifestResult = Repository.ImportManifest(Json, depotNumber, scottishManifest);
-                FailedImportManifestResult = Repository.ImportManifest(Json);
+                if (failedImportManifestResult.Status != QueryStatus.OK) return BadRequest();  //NotFound();
 
-                if (FailedImportManifestResult.Status != QueryStatus.OK) return BadRequest();  //NotFound();
-
-                return Ok(ReturnedData<ManifestImportDetailUpdateFailed>.ReturnData(FailedImportManifestResult.Results));
+                return Ok(ReturnedData<ManifestImportDetailUpdateFailed>.ReturnData(failedImportManifestResult.Results));
             }
         }
     }

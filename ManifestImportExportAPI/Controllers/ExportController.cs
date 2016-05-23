@@ -2,7 +2,6 @@
 using ManifestImportExportAPI.Repositories;
 using ManifestImportExportAPI.Repositories.RepositoryInterfaces;
 using System;
-using System.Collections.Generic;
 using System.Web.Http;
 
 namespace ManifestImportExportAPI.Controllers
@@ -28,13 +27,11 @@ namespace ManifestImportExportAPI.Controllers
             [Route("Consignments")]
             public IHttpActionResult Get(Int32 depotNumber, DateTime manifestDate)
             {
-                RetrieveResults<ManifestExport> ExportManifestConsResult = new RetrieveResults<ManifestExport>();
+                var exportManifestConsResult = Repository.ExportManifest(depotNumber, manifestDate);
 
-                ExportManifestConsResult = Repository.ExportManifest(depotNumber, manifestDate);
+                if (exportManifestConsResult.Status == QueryStatus.NO_DATA) return NotFound();
 
-                if (ExportManifestConsResult.Status == QueryStatus.NO_DATA) return NotFound();
-
-                return Ok(ReturnedData<ManifestExport>.ReturnData(ExportManifestConsResult.Results));
+                return Ok(ReturnedData<ManifestExport>.ReturnData(exportManifestConsResult.Results));
             }
 
             // GET: api/ExportManifest
@@ -42,13 +39,11 @@ namespace ManifestImportExportAPI.Controllers
             [Route("Barcodes")]
             public IHttpActionResult GetBarcodes(Int32 depotNumber, DateTime manifestDate)
             {
-                RetrieveResults<ManifestExportBarcode> ExportManifestBarcodeResult = new RetrieveResults<ManifestExportBarcode>();
+                var exportManifestBarcodeResult = Repository.ExportManifestBarcode(depotNumber, manifestDate);
 
-                ExportManifestBarcodeResult = Repository.ExportManifestBarcode(depotNumber, manifestDate);
+                if (exportManifestBarcodeResult.Status == QueryStatus.NO_DATA) return NotFound();
 
-                if (ExportManifestBarcodeResult.Status == QueryStatus.NO_DATA) return NotFound();
-
-                return Ok(ReturnedData<ManifestExportBarcode>.ReturnData(ExportManifestBarcodeResult.Results));
+                return Ok(ReturnedData<ManifestExportBarcode>.ReturnData(exportManifestBarcodeResult.Results));
             }
 
             // GET: api/ExportManifest
@@ -56,13 +51,11 @@ namespace ManifestImportExportAPI.Controllers
             [Route("Counts")]
             public IHttpActionResult GetCounts()
             {
-                RetrieveResults<ManifestExportCounts> ExportManifestCountsResult = new RetrieveResults<ManifestExportCounts>();
+                var exportManifestCountsResult = Repository.ManifestExportCounts();
 
-                ExportManifestCountsResult = Repository.ManifestExportCounts();
+                if (exportManifestCountsResult.Status == QueryStatus.NO_DATA) return NotFound();
 
-                if (ExportManifestCountsResult.Status == QueryStatus.NO_DATA) return NotFound();
-
-                return Ok(ReturnedData<ManifestExportCounts>.ReturnData(ExportManifestCountsResult.Results));
+                return Ok(ReturnedData<ManifestExportCounts>.ReturnData(exportManifestCountsResult.Results));
             }
 
 
@@ -71,15 +64,13 @@ namespace ManifestImportExportAPI.Controllers
             // PUT: api/ExportManifest
             [HttpPut]
             [Route("LastExportTimestamp")]
-            public IHttpActionResult Put([FromBody]string Json)
+            public IHttpActionResult Put([FromBody]string json)
             {
-                RetrieveResults<ManifestImportDetailUpdateFailed> FailedImportDetailUpdateResult = new RetrieveResults<ManifestImportDetailUpdateFailed>();
+                var failedImportDetailUpdateResult = Repository.ManifestImportDetailUpdate(json);
 
-                FailedImportDetailUpdateResult = Repository.ManifestImportDetailUpdate(Json);
+                if (failedImportDetailUpdateResult.Status != QueryStatus.OK) return BadRequest();  //NotFound();
 
-                if (FailedImportDetailUpdateResult.Status != QueryStatus.OK) return BadRequest();  //NotFound();
-
-                return Ok(ReturnedData<ManifestImportDetailUpdateFailed>.ReturnData(FailedImportDetailUpdateResult.Results));
+                return Ok(ReturnedData<ManifestImportDetailUpdateFailed>.ReturnData(failedImportDetailUpdateResult.Results));
             }
         }
     }

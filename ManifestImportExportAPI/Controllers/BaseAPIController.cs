@@ -2,13 +2,10 @@
 using ManifestImportExportAPI.Models;
 using ManifestImportExportAPI.Repositories;
 using Microsoft.AspNet.Identity.Owin;
-using System;
 using System.Collections.Generic;
-using System.IdentityModel.Claims;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Claims;
-using System.Web;
 using System.Web.Http;
 
 namespace ManifestImportExportAPI.Controllers
@@ -18,27 +15,15 @@ namespace ManifestImportExportAPI.Controllers
         private APCUserManager _userManager = null;
         private APCRoleManager _roleManager = null;
 
-        protected APCUserManager UserManager
-        {
-            get
-            {
-                return _userManager ?? Request.GetOwinContext().GetUserManager<APCUserManager>();
-            }
-        }
+        protected APCUserManager UserManager => _userManager ?? Request.GetOwinContext().GetUserManager<APCUserManager>();
 
-        protected APCRoleManager RoleManager
-        {
-            get
-            {
-                return _roleManager ?? Request.GetOwinContext().GetUserManager<APCRoleManager>();
-            }
-        }
+        protected APCRoleManager RoleManager => _roleManager ?? Request.GetOwinContext().GetUserManager<APCRoleManager>();
 
         public BaseApiController()
         {
         }
 
-        protected IEnumerable<System.Security.Claims.Claim> UserClaims()
+        protected IEnumerable<Claim> UserClaims()
         {
             var identity = (ClaimsIdentity)User.Identity;
             var claims = identity.Claims;
